@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>坐标转换工具</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#3b82f6',
+            secondary: '#64748b',
+            accent: '#10b981',
+            dark: '#1e293b',
+            light: '#f8fafc'
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+          boxShadow: {
+            'card': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+            'card-hover': '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          }
+        },
+      }
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .transition-all-300 {
+        transition: all 300ms ease-in-out;
+      }
+      .input-focus {
+        @apply focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none;
+      }
+      .btn-effect {
+        @apply transform hover:scale-105 active:scale-95 transition-all duration-200;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans text-dark">
+  <!-- 顶部导航 -->
+  <header class="bg-white shadow-sm sticky top-0 z-10">
+    <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+      <div class="flex items-center space-x-2">
+        <i class="fa fa-exchange text-primary text-2xl"></i>
+        <h1 class="text-xl md:text-2xl font-bold text-primary">坐标转换工具</h1>
+      </div>
+      <div class="text-sm text-secondary">
+        <span class="hidden md:inline"> </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主要内容 -->
+  <main class="container mx-auto px-4 py-8">
+    <!-- 转换工具主体 -->
+    <div class="bg-white rounded-xl shadow-card p-6 transform hover:shadow-card-hover transition-all-300 max-w-3xl mx-auto">
+      <!-- 转换方向下拉选择 -->
+      <div class="mb-6">
+        <label for="convert-direction" class="block text-sm font-medium text-secondary mb-2">转换方向</label>
+        <select id="convert-direction" class="w-full p-2 border border-gray-300 rounded-lg input-focus">
+          <option value="degree-to-dms">度→度分秒</option>
+          <option value="dms-to-degree">度分秒→度</option>
+        </select>
+      </div>
+      
+      <!-- 输入区域 -->
+      <div class="mb-4">
+        <label id="input-label" class="block text-sm font-medium text-secondary mb-1">输入度 (支持空格、英文逗号、中文逗号分隔，一行多条或每行一条)</label>
+        <textarea 
+          id="convert-input" 
+          class="w-full h-48 p-3 border border-gray-300 rounded-lg resize-y input-focus"
+          placeholder="请输入度数值"
+        ></textarea>
+      </div>
+      
+      <div class="flex gap-4 mb-6">
+        <button id="start-convert" class="bg-primary text-white px-4 py-2 rounded-lg flex items-center justify-center btn-effect flex-1">
+          <i class="fa fa-refresh mr-2"></i>开始转换
+        </button>
+        <button id="clear-input" class="bg-gray-200 text-secondary px-4 py-2 rounded-lg flex items-center justify-center btn-effect">
+          <i class="fa fa-trash mr-2"></i>清空
+        </button>
+      </div>
+      
+      <!-- 结果区域 -->
+      <div class="mb-2">
+        <div class="flex justify-between items-center mb-1">
+          <label id="result-label" class="block text-sm font-medium text-secondary">转换结果 (每行一个结果)</label>
+          <div class="flex gap-2">
+            <button id="copy-result" class="text-primary text-sm flex items-center btn-effect">
+              <i class="fa fa-copy mr-1"></i>复制结果
+            </button>
+            <button id="export-csv" class="text-accent text-sm flex items-center btn-effect">
+              <i class="fa fa-download mr-1"></i>导出CSV
+            </button>
+          </div>
+        </div>
+        <div id="convert-result" class="w-full h-48 p-3 border border-gray-300 rounded-lg bg-gray-50 overflow-auto whitespace-pre-wrap"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 页脚 -->
+  <footer class="bg-white border-t border-gray-200 mt-12 py-6">
+    <div class="container mx-auto px-4 text-center text-secondary text-sm">
+      <p>坐标转换工具 | 作者：LK</p>
+    </div>
+  </footer>
+
+  <!-- 通知组件 -->
+  <div id="notification" class="fixed bottom-4 right-4 bg-dark text-white px-4 py-2 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center">
+    <i class="fa fa-check-circle mr-2"></i>
+    <span id="notification-text">操作成功</span>
+  </div>
+
+  <script>
+    // 显示通知
+    function showNotification(message) {
+      const notification = document.getElementById('notification');
+      const notificationText = document.getElementById('notification-text');
+      
+      notificationText.textContent = message;
+      notification.classList.remove('translate-y-20', 'opacity-0');
+      notification.classList.add('translate-y-0', 'opacity-100');
+      
+      setTimeout(() => {
+        notification.classList.remove('translate-y-0', 'opacity-100');
+        notification.classList.add('translate-y-20', 'opacity-0');
+      }, 2000);
+    }
+
+    // 度转度分秒
+    function degreeToDMS(degree) {
+      if (isNaN(degree)) return '无效输入';
+      
+      const isNegative = degree < 0;
+      const absDegree = Math.abs(degree);
+      
+      const d = Math.floor(absDegree);
+      const minDecimal = (absDegree - d) * 60;
+      const m = Math.floor(minDecimal);
+      const s = (minDecimal - m) * 60;
+      
+      // 格式化输出，秒保留4位小数
+      const formattedD = isNegative ? -d : d;
+      return `${formattedD}°${m}′${s.toFixed(4)}″`;
+    }
+
+    // 度分秒转度（支持带符号输入）
+    function dmstoDegree(dmsStr) {
+      // 移除所有度分秒符号（°、′、″、'、"），保留数字、空格、负号和小数点
+      const cleanedStr = dmsStr.trim().replace(/[°′″'"]/g, ' ');
+      
+      // 提取所有数字部分（支持负数和小数）
+      const numberPattern = /-?\d+(\.\d+)?/g;
+      const parts = cleanedStr.match(numberPattern);
+      
+      // 检查是否提取到3个有效数字
+      if (!parts || parts.length !== 3) return '格式错误';
+      
+      const d = parseFloat(parts[0]);
+      const m = parseFloat(parts[1]);
+      const s = parseFloat(parts[2]);
+      
+      if (isNaN(d) || isNaN(m) || isNaN(s)) return '无效数值';
+      
+      // 计算总度数，保留8位小数，不添加度符号
+      const isNegative = d < 0;
+      const absD = Math.abs(d);
+      const totalDegree = absD + m / 60 + s / 3600;
+      const result = isNegative ? -totalDegree : totalDegree;
+      
+      return result.toFixed(8);
+    }
+
+    // 通用输入解析函数（支持空格、英文逗号、中文逗号、换行分隔）
+    function parseInput(text, convertType) {
+      // 替换中文逗号为英文逗号，统一处理
+      let processedText = text.trim().replace(/，/g, ',');
+      
+      if (convertType === 'degree-to-dms') {
+        // 度输入：直接按逗号和空格分割（所有分隔符都视为数据分隔）
+        return processedText
+          .replace(/,/g, ' ')  // 逗号替换为空格
+          .replace(/\s+/g, ' ')  // 多个空格合并为一个
+          .split(' ')  // 按空格分割
+          .filter(item => item.trim() !== '');  // 过滤空项
+      } else {
+        // 度分秒输入：智能解析，支持空格、逗号分隔多个数据项
+        // 关键修复：先将所有逗号替换为特殊标记，再处理空格分隔
+        processedText = processedText.replace(/,/g, '###SEP###');
+        
+        // 按换行分割，处理每行数据
+        const lines = processedText.split('\n').filter(line => line.trim() !== '');
+        let items = [];
+        
+        lines.forEach(line => {
+          // 处理空格分隔的多个度分秒数据项
+          // 思路：找到连续的3个数字组合（度、分、秒），作为一个数据项
+          const dataItems = extractDMSItems(line);
+          items = items.concat(dataItems);
+        });
+        
+        return items;
+      }
+    }
+
+    // 提取度分秒数据项（核心修复函数）
+    function extractDMSItems(text) {
+      // 恢复逗号分隔符
+      text = text.replace(/###SEP###/g, ',');
+      
+      // 移除所有度分秒符号，统一用空格分隔
+      let cleanedText = text.replace(/[°′″'"]/g, ' ');
+      
+      // 提取所有数字（包括负数和小数）
+      const numberPattern = /-?\d+(\.\d+)?/g;
+      const allNumbers = cleanedText.match(numberPattern) || [];
+      
+      // 每3个数字组成一个度分秒数据项
+      const dmsItems = [];
+      for (let i = 0; i < allNumbers.length; i += 3) {
+        if (i + 2 < allNumbers.length) {
+          // 组合成度分秒格式（保留空格分隔）
+          const dmsItem = `${allNumbers[i]} ${allNumbers[i+1]} ${allNumbers[i+2]}`;
+          dmsItems.push(dmsItem);
+        } else {
+          // 数字个数不足3个，视为无效数据
+          dmsItems.push('格式错误');
+          break;
+        }
+      }
+      
+      return dmsItems;
+    }
+
+    // 更新输入提示
+    function updateInputHint(convertType) {
+      const inputLabel = document.getElementById('input-label');
+      const resultLabel = document.getElementById('result-label');
+      const convertInput = document.getElementById('convert-input');
+      
+      if (convertType === 'degree-to-dms') {
+        inputLabel.textContent = '输入度 (支持空格、中英文逗号分隔，一行多条或每行一条)';
+        convertInput.placeholder = '请输入度数值';
+        resultLabel.textContent = '转换结果';
+      } else {
+        inputLabel.textContent = '输入度分秒 (支持空格、中英文逗号分隔，一行多条或每行一条)';
+        convertInput.placeholder = '请输入度分秒数值';
+        resultLabel.textContent = '转换结果';
+      }
+    }
+
+    // 导出为CSV文件
+    function exportToCSV() {
+      const result = document.getElementById('convert-result').textContent;
+      const convertType = document.getElementById('convert-direction').value;
+      
+      if (!result.trim()) {
+        showNotification('无结果可导出');
+        return;
+      }
+      
+      // 设置CSV表头
+      let header = '';
+      if (convertType === 'degree-to-dms') {
+        header = '度,度分秒\n';
+        // 获取原始输入数据
+        const inputItems = parseInput(document.getElementById('convert-input').value, convertType);
+        const resultItems = result.split('\n');
+        
+        // 组合原始数据和转换结果
+        let csvContent = header;
+        for (let i = 0; i < inputItems.length; i++) {
+          // 转义CSV中的逗号
+          const input = inputItems[i].replace(/,/g, '，');
+          const output = resultItems[i] ? resultItems[i].replace(/,/g, '，') : '';
+          csvContent += `${input},${output}\n`;
+        }
+        
+        downloadCSV(csvContent, '度到度分秒转换结果.csv');
+      } else {
+        header = '度分秒,度\n';
+        // 获取原始输入数据
+        const inputItems = parseInput(document.getElementById('convert-input').value, convertType);
+        const resultItems = result.split('\n');
+        
+        // 组合原始数据和转换结果
+        let csvContent = header;
+        for (let i = 0; i < inputItems.length; i++) {
+          // 转义CSV中的逗号
+          const input = inputItems[i].replace(/,/g, '，');
+          const output = resultItems[i] ? resultItems[i].replace(/,/g, '，') : '';
+          csvContent += `${input},${output}\n`;
+        }
+        
+        downloadCSV(csvContent, '度分秒到度转换结果.csv');
+      }
+    }
+
+    // 下载CSV文件
+    function downloadCSV(content, filename) {
+      // 创建Blob对象
+      const blob = new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8;' });
+      
+      // 创建下载链接
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      showNotification('CSV文件已导出');
+    }
+
+    // 初始化页面
+    document.addEventListener('DOMContentLoaded', () => {
+      const convertDirection = document.getElementById('convert-direction');
+      const convertInput = document.getElementById('convert-input');
+      const convertResult = document.getElementById('convert-result');
+      
+      // 初始化输入提示
+      updateInputHint(convertDirection.value);
+      
+      // 切换转换方向时更新提示
+      convertDirection.addEventListener('change', () => {
+        updateInputHint(convertDirection.value);
+        convertInput.value = '';
+        convertResult.textContent = '';
+      });
+
+      // 开始转换
+      document.getElementById('start-convert').addEventListener('click', () => {
+        const input = convertInput.value;
+        const convertType = convertDirection.value;
+        
+        if (!input.trim()) {
+          convertResult.textContent = '请输入转换数值';
+          return;
+        }
+        
+        // 解析输入数据
+        const items = parseInput(input, convertType);
+        
+        if (items.length === 0) {
+          convertResult.textContent = '未识别到有效数值';
+          return;
+        }
+        
+        // 批量转换
+        let results = [];
+        if (convertType === 'degree-to-dms') {
+          results = items.map(item => {
+            const degree = parseFloat(item.trim());
+            return degreeToDMS(degree);
+          });
+        } else {
+          results = items.map(item => {
+            // 如果是已经识别为格式错误的，直接返回
+            if (item === '格式错误') return '格式错误';
+            return dmstoDegree(item.trim());
+          });
+        }
+        
+        // 显示结果，每行一个
+        convertResult.textContent = results.join('\n');
+        showNotification(`转换完成，共处理 ${results.length} 个数据`);
+      });
+
+      // 清空输入
+      document.getElementById('clear-input').addEventListener('click', () => {
+        convertInput.value = '';
+        convertResult.textContent = '';
+        showNotification('已清空');
+      });
+
+      // 复制结果
+      document.getElementById('copy-result').addEventListener('click', () => {
+        const result = convertResult.textContent;
+        if (!result.trim()) {
+          showNotification('无结果可复制');
+          return;
+        }
+        
+        navigator.clipboard.writeText(result).then(() => {
+          showNotification('结果已复制');
+        }).catch(err => {
+          showNotification('复制失败');
+          console.error('复制失败:', err);
+        });
+      });
+
+      // 导出CSV
+      document.getElementById('export-csv').addEventListener('click', exportToCSV);
+
+      // 输入框回车触发转换（Ctrl+Enter）
+      convertInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.ctrlKey) {
+          e.preventDefault();
+          document.getElementById('start-convert').click();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
